@@ -25,10 +25,9 @@ private:
 	Block* blocksRef;
 
 	// LED stuff
-  //Adafruit_DotStar* strip;
   Adafruit_NeoPixel* strip;
 	// indexes of first/last pixel of the block
-	uint8_t head, tail;
+	uint16_t head, tail;
 	// this are vars to keep track of changing colors
   uint8_t r;
   uint8_t g;
@@ -39,25 +38,28 @@ private:
 
   enum {
     TOUCHED = 0,
+    SUSTAINED,
 		RELEASED,
     TEASING,
     WAITING,
     HUSHED
   } state = TEASING;
 
-	Animator_Line* lineA; // Sine  envelope
+  // Normalized brightness level
+  float FLOOR= 0.0; // brigthness when hushed
+  float MIN  = 0.1; // brightenss when sin is at his minimum 
+  float HALF = 0.2; // brightenss when sin is at his maximum
+  float MAX  = 1;   // maximum brightenss when we are in a touched state.
+
+  Animator_Line* lineA; // Sine  envelope
   Animator_Line* lineB; // Full brightness envelope
   Animator_Sine* sine;
-
-  float FLOOR= 0.0;
-  float MIN  = 0.3;
-  float HALF = 0.7;
-  float MAX  = 1;
-
+  
 	// time variables
 	int timeToRampA = 1000;
-	int timeToRampB = 3000;
-	int timeToWait  = 5000;
+	int timeToRampB = 2000;
+	int timeToWait  = 1000;
+  int timeToSustain = 5000;
   long t; // a variable to keep track of the passing time
 
   // a value to keep track of the
@@ -65,14 +67,20 @@ private:
   float y = 0.0;
 public:
 	Block() {};
-	void init(uint8_t _NBLOCKS, Block* _blocksRef, uint8_t _idx, uint8_t _LPB,
-            /*Adafruit_DotStar* _strip*/
-            Adafruit_NeoPixel* _strip);
+  // to each block we must pass:
+  // 1. the number of blocks;
+  // 2. a reference to the Blocks array;
+  // 3. the block index;
+  // 4. the # of LEDs per block;
+  // 5. a reference to the LED strip objects;
+	void init(uint8_t _NBLOCKS, Block* _blocksRef, uint8_t _idx, uint8_t _LPB, Adafruit_NeoPixel* _strip);
 	void update();
   //void triggerTeaser();
 
   void touch();
-  void release();
+  //void release(); //2019-11-10 - not used anymore
+  // with hush and unHush we intend messages the block is sending
+  // to its neighbors to make them fade out and fade in their light respectively.
 	void hush();
 	void unhush();
 

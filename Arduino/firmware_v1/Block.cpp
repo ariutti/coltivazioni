@@ -1,8 +1,6 @@
 #include "Block.h"
 
-void Block::init(uint8_t _NBLOCKS, Block* _blocksRef, uint8_t _idx, uint8_t _LPB,
-					/*Adafruit_DotStar* _strip*/
-					Adafruit_NeoPixel* _strip)
+void Block::init(uint8_t _NBLOCKS, Block* _blocksRef, uint8_t _idx, uint8_t _LPB, Adafruit_NeoPixel* _strip)
 {
   NBLOCKS = _NBLOCKS;
 	blocksRef = _blocksRef;
@@ -12,39 +10,66 @@ void Block::init(uint8_t _NBLOCKS, Block* _blocksRef, uint8_t _idx, uint8_t _LPB
   tail = idx*LPB;
   head = tail + LPB - 1;
 
+  r = 0;
+  g = 0;
+  b = 0;
+
 	//setColor(r, g, b);
   for(int j=0; j<LPB; j++) {
     strip->setPixelColor(tail+j, r, g, b);
   }
-  //strip->show();
 
   lineA = new Animator_Line();
 	lineA->init(0.0, timeToRampA);
 	lineB = new Animator_Line();
 	lineB->init(0.0, timeToRampB);
   sine = new Animator_Sine();
-  sine->init(1.0, 0.0);
+  // to the sine animator we pass:
+  // 1. frequency;
+  // 2. the phase of the pusation;
+  sine->init( 1.0, random(0.0, 2.0*PI) );
+  //sine->init( 1 + (idx / NBLOCKS), 0.0 );
 	state = TEASING;
 	lineA->reach(1.0, timeToRampA);
 }
 
 void Block::update()
 {
-  if( state == RELEASED )
+  if( state == TOUCHED ) 
+  {
+    if(lineA->getState() == Animator_Line::QUIET) {
+      state = SUSTAINED;
+      t = millis();
+    }
+  }
+  else if( state == SUSTAINED )
+  {
+    if( millis() - t > timeToSustain)
+    {
+      //Serial.print("**  Block ");
+      //Serial.print( idx );
+      //Serial.print(" - SUSTAIN TIME PASSED **\n");
+      state = RELEASED;
+      lineB->reach( FLOOR, timeToRampB);
+      unhushNeighbors();
+    }
+  }
+  else if( state == RELEASED )
   {
 		if(lineB->getState() == Animator_Line::QUIET) {
 			state = WAITING;
 			t = millis();
 		}
-
   }
   else if( state == WAITING )
   {
 		if( millis() - t > timeToWait)
 		{
-      Serial.print("**  TIME PASSED **\n");
+      //Serial.print("**  Block ");
+      //Serial.print( idx );
+      //Serial.print(" - WAITING TIME PASSED **\n");
 			state = TEASING;
-			sine->setFreq(1.0); // set a random frequency
+			sine->setFreq(1.0); // TODO: set a random frequency (?!)
 			lineA->reach(1.0, timeToRampA);
 		}
   }
@@ -52,16 +77,18 @@ void Block::update()
 	// update the enveloped sine
 	lineA->update();
 	y = lineA->getY();
-  // first a ADD argulment then a MUL argument.
+  // to sine update pass:
+  // 1. first a ADD argument;
+  // 2. then a MUL argument;
 	sine->update( y*(HALF+MIN)*0.5, y*(HALF-MIN)*0.5);
 	// update the full brightness animator
 	lineB->update();
 	y = sine->getY() + lineB->getY();
 
 	// this are vars to keep track of changing colors
-  r = 255.0 * y;
-  g = 255.0 * y;
-  b = 255.0 * y;
+  r = 255.0 * y * 0.7;
+  g = 255.0 * y * 0.7;
+  b = 255.0 * y * 0.7;
 
 	for(int j=0; j<LPB; j++) {
     strip->setPixelColor(tail+j, r, g, b );
@@ -76,20 +103,22 @@ void Block::touch()
 	if( state != TOUCHED)
 	{
 	  state = TOUCHED;
-		lineA->reach(0.0, timeToRampA);
-	  lineB->reach(1.0, timeToRampB);
+		lineA->reach( FLOOR, timeToRampA);
+	  lineB->reach( MAX, timeToRampB);
     hushNeighbors();
 	}
 }
 
+/*
 void Block::release()
 {
 	if(state == TOUCHED )
 	{
 		state = RELEASED;
-		lineB->reach(FLOOR, timeToRampB);
+		lineB->reach(0.0, timeToRampB);
 	}
 }
+*/
 
 void Block::hush()
 {
@@ -121,9 +150,12 @@ void Block::unhush()
 	}
 }
 
+// each block is responsible to hush its neighbors
 void Block::hushNeighbors()
 {
-  // each block is also responsible to hush its neighbors
+  // first we manage two special cases:
+  // when block is the first or the last one.
+  // Then we treat all the others.
   if( idx == 0 )
   {
 		blocksRef[1].hush();
@@ -139,9 +171,12 @@ void Block::hushNeighbors()
   }
 }
 
+// each block is also responsible to hush its neighbors
 void Block::unhushNeighbors()
 {
-  // each block is also responsible to hush its neighbors
+  // first we manage two special cases:
+  // when block is the first or the last one.
+  // Then we treat all the others.
   if( idx == 0 )
   {
 		blocksRef[1].unhush();

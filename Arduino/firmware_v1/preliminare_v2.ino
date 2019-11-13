@@ -1,3 +1,13 @@
+/*
+La console prevede che ogni blocco sia sempre in uno stato di pulsazione luminosa (stato _teaser_).
+Quando un blocco subisce un tocco, la luminosità relativa sale al 100% e rimane nello stato _sustain_ per un tempo limite prima di avviare la fase di _release_.
+Opzionalmente i blocchi che si trovano ai lati di quello selezionato, si spengono per accentuare l'attenzione sul blocco appena toccato.
+
+La console è' multiutente? Sì. Tutti i blocchi possono essere toccati simultaneamente (21).
+Il tocco non viene disabilitato dai pulsanti che hanno luminosità pari a zero.
+in altri termini, non disabilitiamo il tocco di quelli che si spengono, i quali restano comunque attivi. 
+*/
+
 // BLOCKs ////////////////////////////////////////////////////////
 #include "Block.h";
 #define NBLOCKS 21
@@ -30,7 +40,7 @@ const uint8_t LPB = 16;
 #define LED_COUNT (LPB*NBLOCKS)
 
 // Declare our NeoPixel strip object:
-Adafruit_NeoPixel strip(LED_COUNT, DATAPIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT, DATAPIN, NEO_GRBW + NEO_KHZ800);
 // Argument 1 = Number of pixels in NeoPixel strip
 // Argument 2 = Arduino pin number (most are valid)
 // Argument 3 = Pixel type flags, add together as needed:
@@ -43,7 +53,7 @@ Adafruit_NeoPixel strip(LED_COUNT, DATAPIN, NEO_GRB + NEO_KHZ800);
 // CAPACITIVE STUFF //////////////////////////////////////////////
 #include "Limulo_MPR121.h"
 const uint8_t NMPR = 4;
-const uint8_t NPADS[] = {6, 5, 5, 5}; // NPALLINE
+const uint8_t NPADS[] = {5, 5, 5, 6}; // NPALLINE
 #define FIRST_MPR_ADDR 0x5A
 
 struct mpr121
@@ -65,7 +75,7 @@ int base;
 mpr121 mpr[NMPR];
 
 // UTILITIES /////////////////////////////////////////////////////
-bool bVVVV = false;
+bool bVVVV = true;
 bool DEBUG = false;
 bool bToPlotter = false;
 #define DELAY_TIME 10
@@ -73,7 +83,7 @@ bool bToPlotter = false;
 // SETUP /////////////////////////////////////////////////////////
 void setup()
 {
-	Serial.begin(9660);
+	Serial.begin(9600);
 
 	// PIN STUFF **************************************************/
 	pinMode(6, OUTPUT);
@@ -132,6 +142,12 @@ void setup()
       Serial.print(i);
       Serial.println(";");
     }
+    // to each block we are passing 
+    // 1. the number of blocks;
+    // 2. a reference to the Blocks array;
+    // 3. the block index;
+    // 4. the # of LEDs per block;
+    // 5. a reference to the LED strip objects;
     blocks[i].init(NBLOCKS, blocks, i, LPB, &strip);
   }
 
@@ -159,17 +175,22 @@ void loop()
       {
         // pad 'j' has been touched
         mpr[i].bPadState[j] = true;
-        blocks[j].touch();
+        
+        uint8_t index = composeIndex(i, j);
+        blocks[ index ].touch();
 
-        //if( bToVVVV ) printAllSensors(); // Send serial data to VVVV
+        if( bVVVV ) printAllSensors(); // Send serial data to VVVV
       }
       if (!(mpr[i].currtouched & _BV(j)) && (mpr[i].lasttouched & _BV(j)) )
       {
         // pad 'i' has been released
         mpr[i].bPadState[j] = false;
-        blocks[j].release();
+        /*
+        uint8_t index = composeIndex(i, j);
+        blocks[ index ].release();
+        */
 
-        //if( bToVVVV ) printAllSensors(); // Send serial data to VVVV
+        if( bVVVV ) printAllSensors(); // Send serial data to VVVV
       }
     }
     // reset our state
@@ -262,6 +283,19 @@ void loop()
 
 
 /************************************************************************************
+ * COMPOSE INDEX
+ ***********************************************************************************/
+int composeIndex(int mprIndex, int padIndex) {
+  int acc = 0;
+  for(int i=0; i<mprIndex; i++) {
+    acc += NPADS[i];
+  }
+  return acc + padIndex;  
+}
+
+
+
+/************************************************************************************
  * SERIAL EVENT
  ***********************************************************************************/
 void serialEvent()
@@ -295,8 +329,8 @@ void printAllSensors()
     for(uint8_t j=0; j<NPADS[i]; j++)
     {
       int state = (mpr[i].currtouched & _BV(j)) >> j;
-      if( DEBUG ) Serial.print( state );
+      Serial.print( state );
     }
-    if( DEBUG ) Serial.println(";");
   }
+  Serial.println(";");
 }
