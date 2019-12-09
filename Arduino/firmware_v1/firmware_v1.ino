@@ -10,7 +10,7 @@ in altri termini, non disabilitiamo il tocco di quelli che si spengono, i quali 
 
 // BLOCKs ////////////////////////////////////////////////////////
 #include "Block.h";
-#define NBLOCKS 21
+#define NBLOCKS 2 //21
 Block blocks[NBLOCKS];
 
 // LEDs //////////////////////////////////////////////////////////
@@ -52,8 +52,8 @@ Adafruit_NeoPixel strip(LED_COUNT, DATAPIN, NEO_GRBW + NEO_KHZ800);
 
 // CAPACITIVE STUFF //////////////////////////////////////////////
 #include "Limulo_MPR121.h"
-const uint8_t NMPR = 4;
-const uint8_t NPADS[] = {5, 5, 5, 6}; // NPALLINE
+const uint8_t NMPR = 1;
+const uint8_t NPADS[] = {2, 5, 5, 6}; // NPALLINE {5, 5, 5, 6}
 #define FIRST_MPR_ADDR 0x5A
 
 struct mpr121
